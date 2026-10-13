@@ -1,0 +1,89 @@
+name: 每日快照更新與部署（GitHub Pages）
+
+# 每個交易日各跑一次：
+#   港股收市後 → 08:30 UTC（= 16:30 HKT）
+#   美股收市後 → 21:00 UTC（= 17:00 ET 夏令；冬令為 16:00 EST）
+# cron 一律使用 UTC。週六日不跑（1-5）。
+on:
+  schedule:
+    - cron: "30 8 * * 1-5"
+    - cron: "0 21 * * 1-5"
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+# 讓 job 能把更新後的快照 commit 回 repo，並部署 Pages。
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Pages 同時只部署一次，避免兩個排程互相覆蓋。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 安裝相依套件
+        run: pip install -r requirements.txt
+
+      - name: 產生快照（重新抓價）
+        id: pipeline
+        # 不讓失敗直接中斷 job：先寫出「本次未更新」狀態並部署，
+        # 最後一步才大聲失敗（標紅 + 通知）。
+        run: |
+          set +e
+          python -m pipeline.build_snapshot --refresh
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "pipeline exit code = $code"
+          exit 0
+
+      - name: 標示執行狀態（失敗時寫入「本次未更新」）
+        run: python scripts/mark_status.py "${{ steps.pipeline.outputs.exit_code }}"
+
+      - name: 提交更新的快照
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/data
+          if git diff --cached --quiet; then
+            echo "無資料變更，略過 commit。"
+          else
+            git commit -m "chore(data): 快照 ${{ github.run_id }} ($(date -u +'%Y-%m-%d %H:%M UTC'))"
+            git push
+          fi
+
+      - name: 上傳網站成品（site/）
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: 大聲失敗（抓取失敗時讓本次執行標紅並發通知）
+        if: steps.pipeline.outputs.exit_code != '0'
+        run: |
+          echo "::error title=本次未更新::快照產生失敗（exit ${{ steps.pipeline.outputs.exit_code }}）。頁面已標示『本次未更新』，請檢查上方日誌。"
+          exit 1
+
+  deploy:
+    needs: build
+    # 即使 build 最終標紅，也要把「本次未更新」橫幅部署出去。
+    if: always()
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

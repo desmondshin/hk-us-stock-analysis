@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 虛擬環境
+venv/
+.venv/
+
+# 管線快取（可重建；不入版控）
+data/cache/
+
+# 系統
+.DS_Store
