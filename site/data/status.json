@@ -1,12 +1,12 @@
 {
 "ok": true,
-"run_at_utc": "2026-11-09 19:05 UTC",
-"run_at_hkt": "2026-11-10 03:05 HKT",
-"data_cutoff_hk": "2026-11-06",
+"run_at_utc": "2026-11-10 03:15 UTC",
+"run_at_hkt": "2026-11-10 11:15 HKT",
+"data_cutoff_hk": "2026-11-10",
 "data_cutoff_us": "2026-11-09",
-"scanned": 616,
+"scanned": 617,
 "universe": 629,
-"fetched": 627,
+"fetched": 628,
 "message": "",
-"checked_at_utc": "2026-11-09 19:05 UTC"
+"checked_at_utc": "2026-11-10 03:15 UTC"
 }
